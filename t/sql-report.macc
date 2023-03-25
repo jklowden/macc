@@ -1,0 +1,95 @@
+#! /usr/bin/python3
+from __future__ import print_function
+
+import sys, os, getopt, re, copy
+from pycparser import c_parser, c_generator, c_ast, parse_file
+
+def struct_arg( name, typename ):
+    type = c_ast.PtrDecl( [], c_ast.TypeDecl( name , [], None, 
+                                              c_ast.Struct( typename , None ), 
+                                              None)
+                         )
+
+    return c_ast.Decl( name , [], [], [], [],
+                       type = type, 
+                       init=None,
+                       bitsize=None
+                      )
+
+
+def copy_string( tgt, elem, stmt, ordinal ) :
+    output = c_ast.FuncCall(
+        c_ast.ID('strcpy'),
+        args=c_ast.ExprList(
+            exprs=[
+                c_ast.StructRef(
+                    c_ast.ID( tgt ),
+                    '->',
+                    c_ast.ID( elem.cname ) # element name 
+                )
+                ,
+                c_ast.FuncCall(
+                    c_ast.ID('sqlite3_column_text'),
+                    args=c_ast.ExprList(
+                        exprs=[
+                            c_ast.ID( stmt ), 
+                            c_ast.ID( str(ordinal) )
+                        ]
+                    )
+                ) 
+            ]
+        )
+    )
+    return output
+    
+def copy_int( tgt, elem, stmt, ordinal ) :
+    output = c_ast.Assignment(
+        op = '=',
+        lvalue = c_ast.StructRef( c_ast.ID( tgt ), '->', c_ast.ID( elem.cname ) ),
+        rvalue = c_ast.FuncCall(
+            c_ast.ID('sqlite3_column_int64'),
+            args=c_ast.ExprList(
+                exprs=[
+                    c_ast.ID( stmt ),
+                    c_ast.ID( str(ordinal) )
+                ]
+            )
+        )
+    )
+    return output
+
+def generate_function( name, params, body, return_type = 'void' ):
+    type = c_ast.TypeDecl( name, [], None, 
+                           c_ast.IdentifierType( names = [ return_type ] ) )
+    decl = c_ast.FuncDecl( c_ast.ParamList( params ), type )
+    func = c_ast.FuncDef(
+        decl=c_ast.Decl( name , [], [], [], [], decl, None, None ),
+        param_decls=None, 
+        body=c_ast.Compound( body )
+    ) 
+    return func
+
+macros = {}
+
+def copy_row( struct, stmt, tgt ):
+    nodes = []
+
+    for i, elem in enumerate(struct.elems):
+        node = None
+        if elem.ctype == 'char' and elem.csize > 0:
+            node = copy_string( tgt, elem, stmt, i )
+        elif elem.ctype == 'int':
+            node = copy_int( tgt, elem, stmt, i )
+        else:
+            raise Exception( "unrecognized type %s" % (elem.ctype) )
+
+        nodes.append(node)
+    
+    args = [ struct_arg( stmt, 'sqlite3_stmt'),
+             struct_arg( tgt, struct.name,  ) ]
+   
+    return generate_function( 'copy_row', args, nodes, 'void' )
+
+        
+macros['copy_row'] = copy_row
+

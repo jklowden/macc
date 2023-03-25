@@ -1,0 +1,156 @@
+#! /usr/bin/python3
+from __future__ import print_function
+
+import sys, os, getopt, re, copy
+from pycparser import c_parser, c_generator, c_ast, parse_file
+
+def genast() :
+    uq = [] # no qualifiers
+    parser = c_parser.CParser()
+    ast = parser.parse('')
+
+    copy_row_type = c_ast.TypeDecl( 'copy_row', uq, None, 
+                                    c_ast.IdentifierType( names = ['void'] ) )
+    copy_row_args = [
+        c_ast.Decl('stmt', uq, [], [], [],
+                   type = c_ast.PtrDecl( uq,
+                                         c_ast.TypeDecl(
+                                             'stmt', uq, None, 
+                                             c_ast.Struct('sqlite3_stmt', None), 
+                                             None)),
+                   init=None,
+                   bitsize=None),
+        c_ast.Decl( 'row', uq, [], [], [],
+                    type=c_ast.PtrDecl( uq,
+                                        c_ast.TypeDecl(
+                                            'row', uq, None, 
+                                            c_ast.Struct('sysrow_t', None),
+                                            None)),
+                    init=None,
+                    bitsize=None)
+    ]
+
+    copy_row_decl = c_ast.FuncDecl( c_ast.ParamList( copy_row_args ),
+                                    copy_row_type )
+
+    strcpy_of_type = c_ast.FuncCall( c_ast.ID('strcpy'),
+                                  args=c_ast.ExprList(
+                                      exprs=[
+                                          c_ast.StructRef(
+                                              c_ast.ID('row'),
+                                              '->',
+                                              c_ast.ID('type')
+                                          )
+                                          ,
+                                          c_ast.FuncCall(
+                                              c_ast.ID('sqlite3_column_text'),
+                                              args=c_ast.ExprList(
+                                                  exprs=[
+                                                      c_ast.ID('stmt'),
+                                                      c_ast.UnaryOp(
+                                                          'p++',
+                                                          c_ast.ID('ordinal')
+                                                      )
+                                                  ]
+                                              )
+                                          ) 
+                                      ]
+                                  )
+                                 )
+    
+    strcpy_of_name = c_ast.FuncCall( c_ast.ID('strcpy'),
+                                  args=c_ast.ExprList(
+                                      exprs=[
+                                          c_ast.StructRef(
+                                              c_ast.ID('row'),
+                                              '->',
+                                              c_ast.ID('name')
+                                          )
+                                          ,
+                                          c_ast.FuncCall(
+                                              c_ast.ID('sqlite3_column_text'),
+                                              args=c_ast.ExprList(
+                                                  exprs=[
+                                                      c_ast.ID('stmt'),
+                                                      c_ast.UnaryOp(
+                                                          'p++',
+                                                          c_ast.ID('ordinal')
+                                                      )
+                                                  ]
+                                              )
+                                          ) 
+                                      ]
+                                  )
+                                 )
+
+    strcpy_of_tbl_name = c_ast.FuncCall( c_ast.ID('strcpy'),
+                                  args=c_ast.ExprList(
+                                      exprs=[
+                                          c_ast.StructRef(
+                                              c_ast.ID('row'),
+                                              '->',
+                                              c_ast.ID('tbl_name')
+                                          )
+                                          ,
+                                          c_ast.FuncCall(
+                                              c_ast.ID('sqlite3_column_text'),
+                                              args=c_ast.ExprList(
+                                                  exprs=[
+                                                      c_ast.ID('stmt'),
+                                                      c_ast.UnaryOp(
+                                                          'p++',
+                                                          c_ast.ID('ordinal')
+                                                      )
+                                                  ]
+                                              )
+                                          ) 
+                                      ]
+                                  )
+                                 )
+    
+    assign_rootpage = c_ast.Assignment(
+        op = '=',
+        lvalue = c_ast.StructRef( c_ast.ID('row'), '->', c_ast.ID('rootpage') ),
+        rvalue = c_ast.FuncCall(
+            c_ast.ID('sqlite3_column_int64'),
+            args=c_ast.ExprList(
+                exprs=[
+                    c_ast.ID('stmt'),
+                    c_ast.ID('ordinal')
+                ]
+            )
+        )
+    )
+
+    function_body = c_ast.Compound(
+        [
+            c_ast.Decl( 'ordinal', uq, [], [], [],
+                        type = c_ast.TypeDecl( 'ordinal', uq, None,
+                                               c_ast.IdentifierType(['int'])), 
+                        init = c_ast.Constant('int', '0' ),
+                        bitsize=None ),
+            strcpy_of_type, 
+            strcpy_of_name, 
+            strcpy_of_tbl_name, 
+            assign_rootpage
+        ] 
+                                   )
+
+    copy_row_func = c_ast.FuncDef( c_ast.Decl('copy_row', uq, [], [], [], 
+                                        copy_row_decl, None, None),
+                                   param_decls=None, 
+                                   body=function_body,
+                                  ) 
+
+    ast.ext.append(copy_row_func)
+
+    print( '// generated code starts //' )
+    generator = c_generator.CGenerator()
+    print(generator.visit(ast))
+    print( '// generated code ends //' )
+
+def main():
+    genast()
+    
+if __name__ == "__main__":
+    sys.exit(main())
