@@ -50,11 +50,16 @@ class ApplyMacros(c_ast.NodeVisitor):
 
     def apply_macro(self, node, function):
         name = node.type.declname
-        params = node.children()[0][1].params
+
+        last = len(node.children()[0]) - 1
+        params = node.children()[0][last].params
         args = [ p.name for p in params ]
-        tgt_type = node.args.params[1].type.type.type.name
-        struct = self.parsed_structs[ tgt_type ]
-        return function(struct, *args)
+
+        return function(self.parsed_structs, *args)
+
+    def visit_FuncDef(self, node):
+        #rint( node.show(), file=sys.stderr )
+        pass
 
     def visit_Decl(self, node):
         if node.name in self.macros.keys():

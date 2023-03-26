@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -23,6 +24,8 @@ struct sysrow_t {
   char tbl_name[32];
   int rootpage;
 };
+
+int element_count( struct sysrow_t tgt );
 
 #ifdef COPY_ROW_MAC
 void
@@ -76,6 +79,11 @@ int main(int argc, char *argv[])
     errx(EXIT_FAILURE, "%d: %s", __LINE__, sqlite3_errmsg(db));
   }
 
+  {
+    struct sysrow_t row;
+    assert(element_count(row) <= sqlite3_column_count(stmt));
+  }
+  
   while( (erc = sqlite3_step(stmt)) == SQLITE_ROW ) {
     struct sysrow_t row;
     copy_row(stmt, &row);

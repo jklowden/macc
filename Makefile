@@ -9,6 +9,10 @@ FAKE_H = ../3rd/pycparser/utils/fake_libc_include
 INC = $(shell awk -F '[""<>]' '/#include/ { print $$2 }' $1 	\
 	| sed 's/^/-include /')
 
+.SUFFIXES: .ms .pdf
+
+.PHONY: all t doc test
+
 all: t/simple t/sql-report
 
 t/simple: t/simple.c
@@ -24,6 +28,10 @@ t/sql-report: t/sql-report.c
 		-include err.h -include sqlite3.h $(call INC,$<) \
 	$@.i.c -lsqlite3
 
+doc:	doc/macc.pdf
+
+
+
 test: t/sql-report t/db
 	$< t/db
 
@@ -33,3 +41,6 @@ t/db:
 					( 1, 'a' ),  \
 					( 2, 'b' ),  \
 					( 3, 'c' ); "
+.ms.pdf:
+	groff -ms -pte -Tpdf $^ > $@~
+	@mv $@~ $@
