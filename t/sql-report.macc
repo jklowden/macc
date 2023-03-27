@@ -65,35 +65,42 @@ def function_definition( name, params, body, return_type = 'void' ):
 
 macros = {}
 
-# The produced function has an extra leading argument, which is a map of
-# metadata describing all parsed structs. 
+# The macro for a function has an extra leading argument, which is a
+# map of metadata describing all parsed structs.  Each macro parameter
+# is a (type,name) tuple.
 
-def element_count( meta, tgt ):
-    struct = meta['sysrow_t']
-    args = [ formal_val_decl( struct.name, tgt ) ] 
+def struct_member_count( function_name, meta, tgt ):
+    struct = meta[ tgt[0] ]
+    args = [ formal_val_decl( tgt[0], tgt[1] ) ] 
     body = [ function_return( 'int', len(struct.elems) ) ]
-    func = function_definition( 'element_count', args, body, 'int' )
+    func = function_definition( function_name, args, body, 'int' )
     return func 
 
-def copy_row( meta, stmt, tgt ):
-    struct = meta['sysrow_t']
+def element_count( meta, tgt ):
+    return struct_member_count( 'element_count', meta, tgt )
+
+def copy_any_row( function_name, meta, stmt, tgt, return_type ):
+    struct = meta[ tgt[0] ]
     nodes = []
 
     for i, elem in enumerate(struct.elems):
         node = None
         if elem.ctype == 'char' and elem.csize > 0:
-            node = copy_string( tgt, elem.cname, stmt, i )
+            node = copy_string( tgt[1], elem.cname, stmt[1], i )
         elif elem.ctype == 'int':
-            node = copy_int( tgt, elem.cname, stmt, i )
+            node = copy_int( tgt[1], elem.cname, stmt[1], i )
         else:
             raise Exception( "unrecognized type %s" % (elem.ctype) )
 
         nodes.append(node)
     
-    args = [ formal_ptr_decl( 'sqlite3_stmt', stmt ),
-             formal_ptr_decl( struct.name,    tgt ) ]
+    args = [ formal_ptr_decl( stmt[0], stmt[1] ),
+             formal_ptr_decl( tgt[0], tgt[1] ) ]
    
-    return function_definition( 'copy_row', args, nodes, 'void' )
+    return function_definition( function_name, args, nodes, return_type )
+
+def copy_row( meta, stmt, tgt ):
+    return copy_any_row( 'copy_row', meta, stmt, tgt, 'void' )
 
         
 macros['copy_row'] = copy_row

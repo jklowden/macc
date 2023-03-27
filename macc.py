@@ -48,12 +48,17 @@ class ApplyMacros(c_ast.NodeVisitor):
         self.parsed_structs = parsed_structs
         self.macros = macros
 
+    def type_of(self, node):
+        while( not isinstance(node.type, c_ast.TypeDecl) ):
+            node = node.type
+        return node.type.type.name
+
     def apply_macro(self, node, function):
         name = node.type.declname
 
         last = len(node.children()[0]) - 1
         params = node.children()[0][last].params
-        args = [ p.name for p in params ]
+        args = [ (self.type_of(p), p.name) for p in params ]
 
         return function(self.parsed_structs, *args)
 
