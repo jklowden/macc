@@ -41,9 +41,9 @@ For the last 4 decades, database application programmers have been saddled with 
 .RE
 .DE
 .PP
-That assignment (of database data to program memory) cannot be implemented by any preprocessor or library because the fetched database data is an
-.I "array of runtime types and values" .
-The SQL sent to the DBMS determines both the number of columns in any result row, and the type of each column.  The DBMS client library \(em ODBC, or other \(em converts the database datatype to a C datatype.  There is no way for the DBMS client library synthesize a \f[CB]my_row_t\f[] object for the compiler to copy.  
+That assignment (of database data to program memory) cannot be implemented by any preprocessor or library because C lacks introspection: they can't iterate over the members of
+.CW struct\ my_row_t ,
+ascertain each one's datatype, and produce the appropriate DBMS function call to populate the field.  So, the job is left to the programmer. 
 .PP
 Typical of this drudgery is the ODBC \f[CB]SQLBindCol\f[] function:
 .DS L
